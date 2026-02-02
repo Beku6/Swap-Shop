@@ -157,14 +157,28 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                    Text(
-                      'Swap-Shop',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.75,
-                        color: appTextPrimary,
-                      ),
+                    Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.asset(
+                            'assets/images/logo.jpeg',
+                            height: 28,
+                            width: 28,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Swap-Shop',
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.75,
+                            color: appTextPrimary,
+                          ),
+                        ),
+                      ],
                     ),
                     Container(
                         width: 40,
