@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_future_builder_safe.dart';
+import '../../../../core/widgets/app_skeletons.dart';
 import '../../../../core/widgets/image_with_fallback.dart';
 import '../../data/wallet_design_controller.dart';
 
@@ -19,12 +21,6 @@ class _WalletPageState extends State<WalletPage> {
       'https://images.unsplash.com/photo-1760224254117-7a40f7f03fe2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRhcmslMjBwcmVtaXVtJTIwdGV4dHVyZSUyMGx1eHVyeXxlbnwxfHx8fDE3Njk4NTcyMzV8MA&ixlib=rb-4.1.0&q=80&w=1080';
   static const String _textureUrl =
       'https://www.transparenttextures.com/patterns/carbon-fibre.png';
-
-  @override
-  void initState() {
-    super.initState();
-    _designController.load();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,11 +67,40 @@ class _WalletPageState extends State<WalletPage> {
       ),
     ];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 128),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return AppFutureBuilderSafe<void>(
+      futureFactory: _designController.load,
+      loadingBuilder: (context) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 128),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 64),
+            AppSkeletonBlock(height: 224, radius: 32),
+            SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(child: AppSkeletonBlock(height: 88, radius: 16)),
+                SizedBox(width: 16),
+                Expanded(child: AppSkeletonBlock(height: 88, radius: 16)),
+                SizedBox(width: 16),
+                Expanded(child: AppSkeletonBlock(height: 88, radius: 16)),
+                SizedBox(width: 16),
+                Expanded(child: AppSkeletonBlock(height: 88, radius: 16)),
+              ],
+            ),
+            SizedBox(height: 28),
+            AppSkeletonBlock(height: 90, radius: 20),
+            SizedBox(height: 12),
+            AppSkeletonBlock(height: 90, radius: 20),
+          ],
+        ),
+      ),
+      errorTitle: 'Unable to load wallet',
+      dataBuilder: (context, _) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 128),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           SafeArea(
             bottom: false,
             child: Column(
@@ -154,9 +179,11 @@ class _WalletPageState extends State<WalletPage> {
                           color: AppColors.appBgDark,
                           child: Opacity(
                             opacity: 0.03,
-                            child: Image.network(
-                              _textureUrl,
+                            child: const ImageWithFallback(
+                              src: _textureUrl,
                               fit: BoxFit.cover,
+                              cacheWidth: 1080,
+                              cacheHeight: 640,
                             ),
                           ),
                         ),
@@ -166,7 +193,12 @@ class _WalletPageState extends State<WalletPage> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            const ImageWithFallback(src: _photoUrl, fit: BoxFit.cover),
+                            const ImageWithFallback(
+                              src: _photoUrl,
+                              fit: BoxFit.cover,
+                              cacheWidth: 1080,
+                              cacheHeight: 640,
+                            ),
                             Container(color: Colors.black.withValues(alpha: 0.2)),
                           ],
                         ),
@@ -364,7 +396,8 @@ class _WalletPageState extends State<WalletPage> {
           Column(
             children: transactions.map((tx) => _TransactionTile(item: tx)).toList(),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -583,14 +616,21 @@ class _DesignPreview extends StatelessWidget {
               color: AppColors.appBgDark,
               child: Opacity(
                 opacity: 0.03,
-                child: Image.network(
-                  _WalletPageState._textureUrl,
+                child: const ImageWithFallback(
+                  src: _WalletPageState._textureUrl,
                   fit: BoxFit.cover,
+                  cacheWidth: 168,
+                  cacheHeight: 108,
                 ),
               ),
             ),
           if (design.id == WalletCardDesign.photo)
-            const ImageWithFallback(src: _WalletPageState._photoUrl, fit: BoxFit.cover),
+            const ImageWithFallback(
+              src: _WalletPageState._photoUrl,
+              fit: BoxFit.cover,
+              cacheWidth: 168,
+              cacheHeight: 108,
+            ),
           if (design.id == WalletCardDesign.minimal) Container(color: AppColors.white),
           if (design.id == WalletCardDesign.metallic)
             Stack(

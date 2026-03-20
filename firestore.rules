@@ -1,0 +1,200 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function participant(data) {
+      return data.participantIds is list &&
+        data.participantIds.hasAny([request.auth.uid]);
+    }
+
+    function validProduct(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'title',
+          'description',
+          'price',
+          'category',
+          'imageUrls',
+          'createdAt',
+          'likesCount',
+          'isAvailable',
+          'isForSwap'
+        ]) &&
+        data.ownerId is string &&
+        data.title is string &&
+        data.description is string &&
+        data.price is int &&
+        data.category is string &&
+        data.imageUrls is list &&
+        data.createdAt is timestamp &&
+        data.likesCount is int &&
+        data.isAvailable is bool &&
+        data.isForSwap is bool;
+    }
+
+    match /products/{productId} {
+      allow get, list: if signedIn();
+
+      allow create: if signedIn() &&
+        request.resource.data.ownerId == request.auth.uid &&
+        validProduct(request.resource.data);
+
+      allow update: if signedIn() &&
+        resource.data.ownerId == request.auth.uid &&
+        request.resource.data.ownerId == resource.data.ownerId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        validProduct(request.resource.data);
+
+      allow delete: if signedIn() &&
+        resource.data.ownerId == request.auth.uid;
+    }
+
+    match /chatThreads/{threadId} {
+      allow read: if signedIn() && participant(resource.data);
+
+      allow create: if signedIn() &&
+        request.resource.data.participantIds is list &&
+        request.resource.data.participantIds.size() == 2 &&
+        request.resource.data.participantIds.hasAny([request.auth.uid]);
+
+      allow update: if signedIn() &&
+        participant(resource.data) &&
+        request.resource.data.participantIds == resource.data.participantIds &&
+        request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function threadDoc() {
+          return get(
+            /databases/$(database)/documents/chatThreads/$(threadId)
+          ).data;
+        }
+
+        allow read: if signedIn() &&
+          threadDoc().participantIds is list &&
+          threadDoc().participantIds.hasAny([request.auth.uid]);
+
+        allow create: if signedIn() &&
+          threadDoc().participantIds is list &&
+          threadDoc().participantIds.hasAny([request.auth.uid]) &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.threadId == threadId;
+
+        allow update: if signedIn() &&
+          threadDoc().participantIds is list &&
+          threadDoc().participantIds.hasAny([request.auth.uid]) &&
+          request.resource.data.senderId == resource.data.senderId &&
+          request.resource.data.threadId == resource.data.threadId &&
+          request.resource.data.sentAt == resource.data.sentAt;
+
+        allow delete: if false;
+      }
+    }
+
+    match /swapProposals/{proposalId} {
+      allow read: if signedIn() &&
+        (resource.data.proposerId == request.auth.uid ||
+          resource.data.receiverId == request.auth.uid);
+
+      allow create: if signedIn() &&
+        request.resource.data.proposerId == request.auth.uid &&
+        request.resource.data.receiverId is string;
+
+      allow update: if signedIn() &&
+        (resource.data.proposerId == request.auth.uid ||
+          resource.data.receiverId == request.auth.uid) &&
+        request.resource.data.proposerId == resource.data.proposerId &&
+        request.resource.data.receiverId == resource.data.receiverId &&
+        request.resource.data.offeredProductId == resource.data.offeredProductId &&
+        request.resource.data.requestedProductId == resource.data.requestedProductId &&
+        request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow get: if isSelf(userId);
+      allow list: if false;
+      allow create: if isSelf(userId) &&
+        request.resource.data.keys().hasOnly(['avatarUrl']) &&
+        request.resource.data.avatarUrl is string;
+      allow update: if isSelf(userId) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'avatarUrl'
+        ]) &&
+        (!('avatarUrl' in request.resource.data) ||
+          request.resource.data.avatarUrl is string);
+
+      match /cart/{itemId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /favorites/{favoriteId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /chatThreads/{threadId} {
+        allow read: if isSelf(userId);
+
+        allow create, update: if signedIn() &&
+          request.resource.data.participantIds is list &&
+          request.resource.data.participantIds.size() == 2 &&
+          request.resource.data.participantIds.hasAny([request.auth.uid]) &&
+          request.resource.data.participantIds.hasAny([userId]);
+
+        allow delete: if signedIn() &&
+          resource.data.participantIds is list &&
+          resource.data.participantIds.hasAny([request.auth.uid]) &&
+          resource.data.participantIds.hasAny([userId]);
+      }
+
+      match /swapProposals/{proposalId} {
+        allow read: if isSelf(userId);
+
+        allow create, update: if signedIn() &&
+          request.resource.data.proposerId is string &&
+          request.resource.data.receiverId is string &&
+          (request.resource.data.proposerId == request.auth.uid ||
+            request.resource.data.receiverId == request.auth.uid) &&
+          (userId == request.resource.data.proposerId ||
+            userId == request.resource.data.receiverId);
+
+        allow delete: if false;
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isSelf(userId);
+
+        allow create: if isSelf(userId) &&
+          request.resource.data.keys().hasAll([
+            'type',
+            'title',
+            'body',
+            'data',
+            'createdAt',
+            'isRead'
+          ]);
+
+        allow update: if isSelf(userId) &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'isRead'
+          ]) &&
+          request.resource.data.isRead is bool;
+
+        allow delete: if false;
+      }
+
+      match /devices/{token} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -10,12 +11,30 @@ class ImageWithFallback extends StatelessWidget {
   final String? src;
   final String? alt;
   final BoxFit fit;
+  final int? cacheWidth;
+  final int? cacheHeight;
+  final Duration fadeInDuration;
+  final Color? placeholderColor;
+  final Alignment alignment;
 
-  const ImageWithFallback({super.key, this.src, this.alt, this.fit = BoxFit.cover});
+  const ImageWithFallback({
+    super.key,
+    this.src,
+    this.alt,
+    this.fit = BoxFit.cover,
+    this.cacheWidth,
+    this.cacheHeight,
+    this.fadeInDuration = Duration.zero,
+    this.placeholderColor,
+    this.alignment = Alignment.center,
+  });
 
   static final Uint8List _errorBytes = base64Decode(
     'PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg==',
   );
+  static final MemoryImage _errorImageProvider = MemoryImage(_errorBytes);
+
+  static ImageProvider<Object> get errorImageProvider => _errorImageProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -26,21 +45,38 @@ class ImageWithFallback extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final pixelRatio = MediaQuery.of(context).devicePixelRatio;
-        final hasFiniteWidth = constraints.maxWidth.isFinite && constraints.maxWidth > 0;
-        final hasFiniteHeight = constraints.maxHeight.isFinite && constraints.maxHeight > 0;
-        final cacheWidth = hasFiniteWidth ? (constraints.maxWidth * pixelRatio).round() : null;
-        final cacheHeight = hasFiniteHeight ? (constraints.maxHeight * pixelRatio).round() : null;
+        final hasFiniteWidth =
+            constraints.maxWidth.isFinite && constraints.maxWidth > 0;
+        final hasFiniteHeight =
+            constraints.maxHeight.isFinite && constraints.maxHeight > 0;
+        final measuredCacheWidth = hasFiniteWidth
+            ? (constraints.maxWidth * pixelRatio).round()
+            : null;
+        final measuredCacheHeight = hasFiniteHeight
+            ? (constraints.maxHeight * pixelRatio).round()
+            : null;
+        final resolvedCacheWidth = measuredCacheWidth ?? cacheWidth;
+        final resolvedCacheHeight = measuredCacheHeight ?? cacheHeight;
 
         return CachedNetworkImage(
           imageUrl: src!,
           fit: fit,
+          alignment: alignment,
           width: double.infinity,
           height: double.infinity,
-          memCacheWidth: cacheWidth,
-          memCacheHeight: cacheHeight,
-          fadeInDuration: Duration.zero,
+          useOldImageOnUrlChange: true,
+          memCacheWidth: resolvedCacheWidth == null
+              ? null
+              : math.max(1, resolvedCacheWidth),
+          memCacheHeight: resolvedCacheHeight == null
+              ? null
+              : math.max(1, resolvedCacheHeight),
+          fadeInDuration: fadeInDuration,
           fadeOutDuration: Duration.zero,
-          placeholder: (context, url) => const SizedBox.expand(),
+          placeholder: (context, url) => ColoredBox(
+            color: placeholderColor ?? Colors.transparent,
+            child: const SizedBox.expand(),
+          ),
           errorWidget: (context, url, error) => _errorWidget(),
         );
       },
@@ -51,7 +87,7 @@ class ImageWithFallback extends StatelessWidget {
     return Container(
       color: AppColors.gray100,
       alignment: Alignment.center,
-      child: Image.memory(_errorBytes),
+      child: Image(image: _errorImageProvider),
     );
   }
 }
